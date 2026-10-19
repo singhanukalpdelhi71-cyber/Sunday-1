@@ -5,7 +5,9 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
@@ -19,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,19 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             SundayScreen()
         }
@@ -56,10 +57,17 @@ class MainActivity : ComponentActivity() {
         }
         var listening by remember { mutableStateOf(false) }
 
+        var pendingContactName by remember { mutableStateOf("") }
+        var pendingContactAction by remember { mutableStateOf("find") }
+        var pendingCallName by remember { mutableStateOf("") }
+        var pendingCallNumber by remember {
+            mutableStateOf<String?>(null)
+        }
+
         val tts = remember {
             TextToSpeech(this) { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    // Voice output is initialized by Android.
+                    ttsLanguageReady = true
                 }
             }
         }
@@ -82,6 +90,103 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        fun searchContact(name: String): Pair<String, String>? {
+            val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+
+            return contentResolver.query(
+                uri,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                arrayOf("%$name%"),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    Pair(cursor.getString(0), cursor.getString(1))
+                } else {
+                    null
+                }
+            }
+        }
+
+        fun handleContactRequest() {
+            val requestedName = pendingContactName
+            val match = try {
+                searchContact(requestedName)
+            } catch (_: SecurityException) {
+                speak("I don't have permission to read contacts.")
+                return
+            } catch (_: Exception) {
+                speak("I couldn't search your contacts.")
+                return
+            }
+
+            if (match == null) {
+                pendingCallName = ""
+                pendingCallNumber = null
+                speak("I couldn't find a contact matching $requestedName.")
+                return
+            }
+
+            val (name, number) = match
+
+            if (pendingContactAction == "call") {
+                pendingCallName = name
+                pendingCallNumber = number
+                speak(
+                    "I found $name, number $number. " +
+                    "Say confirm call to place the call, " +
+                    "or cancel call to cancel."
+                )
+            } else {
+                speak("I found $name. The number is $number.")
+            }
+        }
+
+        val contactsPermissionLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                if (granted) {
+                    handleContactRequest()
+                } else {
+                    speak(
+                        "Contacts permission was denied. " +
+                        "I can't search your contacts."
+                    )
+                }
+            }
+
+        val callPermissionLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                val number = pendingCallNumber
+
+                if (granted && !number.isNullOrBlank()) {
+                    try {
+                        startActivity(
+                            Intent(
+                                Intent.ACTION_CALL,
+                                Uri.parse("tel:$number")
+                            )
+                        )
+                        speak("Calling $pendingCallName.")
+                        pendingCallName = ""
+                        pendingCallNumber = null
+                    } catch (_: Exception) {
+                        speak("I couldn't start the call. Please try again.")
+                    }
+                } else if (!granted) {
+                    speak(
+                        "Phone permission was denied. " +
+                        "I won't place the call."
+                    )
+                }
+            }
+
         fun runCommand(raw: String) {
             val text = raw.trim().lowercase(Locale.ROOT)
 
@@ -91,16 +196,114 @@ class MainActivity : ComponentActivity() {
             }
 
             when {
+                text.startsWith("find contact ") ||
+                    text.startsWith("find ") -> {
+
+                    val name = if (text.startsWith("find contact ")) {
+                        raw.trim().substringAfter("find contact ").trim()
+                    } else {
+                        raw.trim().substringAfter("find ").trim()
+                    }
+
+                    if (name.isBlank()) {
+                        speak("Say find contact followed by the person's name.")
+                    } else {
+                        pendingContactName = name
+                        pendingContactAction = "find"
+
+                        if (
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.READ_CONTACTS
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            handleContactRequest()
+                        } else {
+                            contactsPermissionLauncher.launch(
+                                Manifest.permission.READ_CONTACTS
+                            )
+                        }
+                    }
+                }
+
+                text.startsWith("call ") -> {
+                    val name = raw.trim().substringAfter("call ").trim()
+
+                    if (name.isBlank()) {
+                        speak("Say call followed by the contact's name.")
+                    } else {
+                        pendingContactName = name
+                        pendingContactAction = "call"
+                        pendingCallName = ""
+                        pendingCallNumber = null
+
+                        if (
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.READ_CONTACTS
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            handleContactRequest()
+                        } else {
+                            contactsPermissionLauncher.launch(
+                                Manifest.permission.READ_CONTACTS
+                            )
+                        }
+                    }
+                }
+
+                text == "confirm call" ||
+                    text == "yes confirm call" -> {
+
+                    val number = pendingCallNumber
+
+                    if (number.isNullOrBlank()) {
+                        speak(
+                            "There is no call waiting for confirmation. " +
+                            "First say call followed by a contact's name."
+                        )
+                    } else if (
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.CALL_PHONE
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        try {
+                            startActivity(
+                                Intent(
+                                    Intent.ACTION_CALL,
+                                    Uri.parse("tel:$number")
+                                )
+                            )
+                            speak("Calling $pendingCallName.")
+                            pendingCallName = ""
+                            pendingCallNumber = null
+                        } catch (_: Exception) {
+                            speak("I couldn't start the call. Please try again.")
+                        }
+                    } else {
+                        callPermissionLauncher.launch(
+                            Manifest.permission.CALL_PHONE
+                        )
+                    }
+                }
+
+                text == "cancel call" || text == "cancel" -> {
+                    pendingCallName = ""
+                    pendingCallNumber = null
+                    speak("Call cancelled. I won't place the call.")
+                }
+
                 text in listOf("hello", "hi sunday", "hello sunday") -> {
                     speak("Hello. Sunday is ready.")
                 }
 
-                text.contains("what time") ||
-                    text == "time" -> {
+                text.contains("what time") || text == "time" -> {
                     val time = SimpleDateFormat(
                         "h:mm a",
                         Locale.getDefault()
                     ).format(Date())
+
                     speak("The time is $time.")
                 }
 
@@ -108,12 +311,14 @@ class MainActivity : ComponentActivity() {
                     text.contains("introduce yourself") -> {
                     speak(
                         "I am Sunday, your personal Android assistant. " +
-                        "I can respond to basic commands and help open apps."
+                        "I can respond to commands, search contacts, " +
+                        "and help open apps."
                     )
                 }
 
                 text.startsWith("open ") ||
                     text.startsWith("launch ") -> {
+
                     val appName = text
                         .removePrefix("open ")
                         .removePrefix("launch ")
@@ -163,7 +368,8 @@ class MainActivity : ComponentActivity() {
                 else -> {
                     speak(
                         "I don't understand that command yet. " +
-                        "Could you explain what you want me to do?"
+                        "Try open YouTube, find contact followed by a name, " +
+                        "or call followed by a name."
                     )
                 }
             }
@@ -222,9 +428,7 @@ class MainActivity : ComponentActivity() {
                         speak("Voice recognition is unavailable.")
                     }
                 } else {
-                    speak(
-                        "Microphone permission is needed for voice input."
-                    )
+                    speak("Microphone permission is needed for voice input.")
                 }
             }
 
@@ -261,28 +465,19 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .size(190.dp)
-                            .background(
-                                color = Color(0xFF0C2B40),
-                                shape = CircleShape
-                            ),
+                            .background(Color(0xFF0C2B40), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(145.dp)
-                                .background(
-                                    color = Color(0xFF10506A),
-                                    shape = CircleShape
-                                ),
+                                .background(Color(0xFF10506A), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(95.dp)
-                                    .background(
-                                        color = cyan,
-                                        shape = CircleShape
-                                    ),
+                                    .background(cyan, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -298,11 +493,7 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(20.dp))
 
                     Text(
-                        text = if (listening) {
-                            "LISTENING..."
-                        } else {
-                            "SYSTEM ONLINE"
-                        },
+                        text = if (listening) "LISTENING..." else "SYSTEM ONLINE",
                         color = cyan,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -340,149 +531,4 @@ class MainActivity : ComponentActivity() {
                         value = command,
                         onValueChange = { command = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Give Sunday a command") },
-                        placeholder = {
-                            Text("Try: Open YouTube")
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Send
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onSend = { runCommand(command) }
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = cyan,
-                            unfocusedBorderColor = Color.Gray,
-                            focusedLabelColor = cyan,
-                            unfocusedLabelColor = Color.LightGray,
-                            cursorColor = cyan
-                        )
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Button(
-                        onClick = { runCommand(command) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = cyan,
-                            contentColor = navy
-                        )
-                    ) {
-                        Text(
-                            "EXECUTE COMMAND",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            if (
-                                ContextCompat.checkSelfPermission(
-                                    this@MainActivity,
-                                    Manifest.permission.RECORD_AUDIO
-                                ) == PackageManager.PERMISSION_GRANTED
-                            ) {
-                                try {
-                                    listening = true
-                                    val intent = Intent(
-                                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-                                    ).apply {
-                                        putExtra(
-                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                                        )
-                                        putExtra(
-                                            RecognizerIntent.EXTRA_LANGUAGE,
-                                            Locale.getDefault()
-                                        )
-                                        putExtra(
-                                            RecognizerIntent.EXTRA_PROMPT,
-                                            "Speak to Sunday"
-                                        )
-                                    }
-                                    speechLauncher.launch(intent)
-                                } catch (_: Exception) {
-                                    listening = false
-                                    speak("Voice recognition is unavailable.")
-                                }
-                            } else {
-                                permissionLauncher.launch(
-                                    Manifest.permission.RECORD_AUDIO
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = cyan
-                        )
-                    ) {
-                        Text("🎙  SPEAK TO SUNDAY")
-                    }
-
-                    Spacer(Modifier.height(22.dp))
-
-                    Text(
-                        text = "QUICK LAUNCH",
-                        color = Color.LightGray,
-                        fontSize = 12.sp,
-                        letterSpacing = 2.sp
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    val apps = listOf(
-                        "YouTube",
-                        "WhatsApp",
-                        "Chrome",
-                        "Spotify",
-                        "Instagram",
-                        "Gmail",
-                        "Maps",
-                        "Calendar"
-                    )
-
-                    apps.chunked(2).forEach { rowApps ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement =
-                                Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowApps.forEach { app ->
-                                OutlinedButton(
-                                    onClick = {
-                                        runCommand("open $app")
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    colors =
-                                        ButtonDefaults.outlinedButtonColors(
-                                            contentColor = cyan
-                                        )
-                                ) {
-                                    Text(app)
-                                }
-                            }
-
-                            if (rowApps.size == 1) {
-                                Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(22.dp))
-
-                    Text(
-                        text = "SUNDAY • EARLY DEVELOPMENT BUILD",
-                        color = Color.Gray,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-        }
-    }
-}
+                        label = { 
