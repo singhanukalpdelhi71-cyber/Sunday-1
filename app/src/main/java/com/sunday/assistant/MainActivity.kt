@@ -1,4 +1,4 @@
-
+ 
 package com.sunday.assistant
 
 import android.Manifest
@@ -531,4 +531,139 @@ class MainActivity : ComponentActivity() {
                         value = command,
                         onValueChange = { command = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { 
+                        label = {Text("Give Sunday a command") },
+                        placeholder = { Text("Try: Open YouTube") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = { runCommand(command) }
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = cyan,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedLabelColor = cyan,
+                            unfocusedLabelColor = Color.LightGray,
+                            cursorColor = cyan
+                        )
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { runCommand(command) },modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = cyan,
+                            contentColor = navy
+                        )
+                    ) {
+                        Text("EXECUTE COMMAND", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            if (
+                                ContextCompat.checkSelfPermission(
+                                    this@MainActivity,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                try {
+                                    listening = true
+                                    val intent = Intent(
+                                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                                    ).apply {
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                        )
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_LANGUAGE,
+                                            Locale.getDefault()
+                                        )
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_PROMPT,
+                                            "Speak to Sunday"
+                                        )
+                                    }
+                                    speechLauncher.launch(intent)
+                                } catch (_: Exception) {
+                                    listening = false
+                                    speak("Voice recognition is unavailable.")
+                                }
+                            } else {
+                                permissionLauncher.launch(
+                                    Manifest.permission.RECORD_AUDIO
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = cyan
+                        )
+                    ) {
+                        Text("🎙  SPEAK TO SUNDAY")
+                    }Spacer(Modifier.height(22.dp))
+
+                    Text(
+                        text = "QUICK LAUNCH",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        letterSpacing = 2.sp
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    val apps = listOf(
+                        "YouTube",
+                        "WhatsApp",
+                        "Chrome",
+                        "Spotify",
+                        "Instagram",
+                        "Gmail",
+                        "Maps",
+                        "Calendar"
+                    )
+
+                    apps.chunked(2).forEach { rowApps ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            rowApps.forEach { app ->
+                                OutlinedButton(
+                                    onClick = { runCommand("open $app") },
+                                    modifier = Modifier.weight(1f),
+                                    colors =ButtonDefaults.outlinedButtonColors(
+                                        contentColor = cyan
+                                    )
+                                ) {
+                                    Text(app)
+                                }
+                            }
+
+                            if (rowApps.size == 1) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(22.dp))
+
+                    Text(
+                        text = "SUNDAY • EARLY DEVELOPMENT BUILD",
+                        color = Color.Gray,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+    }
+
+    private var ttsLanguageReady: Boolean = false
+}
+ 
