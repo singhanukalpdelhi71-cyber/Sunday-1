@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
                     text.startsWith("find ") -> {
 
                     val name = if (text.startsWith("find contact ")) {
-                        raw.trim().substringAfter("find contact ").trim()
+                        raw.trim().drop("find contact ".length).trim()
                     } else {
                         raw.trim().substringAfter("find ").trim()
                     }
@@ -227,7 +227,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 text.startsWith("call ") -> {
-                    val name = raw.trim().substringAfter("call ").trim()
+                    val name = val name = raw.trim().drop("call ".length).trim()
 
                     if (name.isBlank()) {
                         speak("Say call followed by the contact's name.")
