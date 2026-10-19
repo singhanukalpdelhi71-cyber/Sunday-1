@@ -227,7 +227,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 text.startsWith("call ") -> {
-                    val name = val name = raw.trim().drop("call ".length).trim()
+                    val name = raw.trim().drop("call ".length).trim()
 
                     if (name.isBlank()) {
                         speak("Say call followed by the contact's name.")
