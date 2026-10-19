@@ -499,7 +499,9 @@ class MainActivity : ComponentActivity() {
                         fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(Modifier.height(22.dp))
+                    }
+
+Spacer(Modifier.height(22.dp))
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
