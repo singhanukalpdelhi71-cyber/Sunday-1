@@ -1,5 +1,4 @@
- 
-package com.sunday.assistant
+ package com.sunday.assistant
 
 import android.Manifest
 import android.app.Activity
@@ -202,7 +201,7 @@ class MainActivity : ComponentActivity() {
                     val name = if (text.startsWith("find contact ")) {
                         raw.trim().drop("find contact ".length).trim()
                     } else {
-                        raw.trim().substringAfter("find ").trim()
+                        raw.trim().drop("find ".length).trim()
                     }
 
                     if (name.isBlank()) {
@@ -303,7 +302,6 @@ class MainActivity : ComponentActivity() {
                         "h:mm a",
                         Locale.getDefault()
                     ).format(Date())
-
                     speak("The time is $time.")
                 }
 
@@ -319,10 +317,12 @@ class MainActivity : ComponentActivity() {
                 text.startsWith("open ") ||
                     text.startsWith("launch ") -> {
 
-                    val appName = text
-                        .removePrefix("open ")
-                        .removePrefix("launch ")
-                        .trim()
+                    val appName = when {
+                        text.startsWith("open ") ->
+                            text.drop("open ".length).trim()
+                        else ->
+                            text.drop("launch ".length).trim()
+                    }
 
                     val packages = mapOf(
                         "youtube" to "com.google.android.youtube",
@@ -499,11 +499,7 @@ class MainActivity : ComponentActivity() {
                         fontWeight = FontWeight.Bold
                     )
 
-                    }
-
-Spacer(Modifier.height(22.dp))
-
-                    Card(
+                    Spacer(Modifier.height(22.dp))                    Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
                             containerColor = panel
@@ -533,7 +529,7 @@ Spacer(Modifier.height(22.dp))
                         value = command,
                         onValueChange = { command = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = {Text("Give Sunday a command") },
+                        label = { Text("Give Sunday a command") },
                         placeholder = { Text("Try: Open YouTube") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -556,13 +552,17 @@ Spacer(Modifier.height(22.dp))
                     Spacer(Modifier.height(12.dp))
 
                     Button(
-                        onClick = { runCommand(command) },modifier = Modifier.fillMaxWidth(),
+                        onClick = { runCommand(command) },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = cyan,
                             contentColor = navy
                         )
                     ) {
-                        Text("EXECUTE COMMAND", fontWeight = FontWeight.Bold)
+                        Text(
+                            "EXECUTE COMMAND",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -577,11 +577,13 @@ Spacer(Modifier.height(22.dp))
                             ) {
                                 try {
                                     listening = true
+
                                     val intent = Intent(
                                         RecognizerIntent.ACTION_RECOGNIZE_SPEECH
                                     ).apply {
                                         putExtra(
-                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                                         )
                                         putExtra(
                                             RecognizerIntent.EXTRA_LANGUAGE,
@@ -592,6 +594,7 @@ Spacer(Modifier.height(22.dp))
                                             "Speak to Sunday"
                                         )
                                     }
+
                                     speechLauncher.launch(intent)
                                 } catch (_: Exception) {
                                     listening = false
@@ -609,7 +612,9 @@ Spacer(Modifier.height(22.dp))
                         )
                     ) {
                         Text("🎙  SPEAK TO SUNDAY")
-                    }Spacer(Modifier.height(22.dp))
+                    }
+
+                    Spacer(Modifier.height(22.dp))
 
                     Text(
                         text = "QUICK LAUNCH",
@@ -640,7 +645,7 @@ Spacer(Modifier.height(22.dp))
                                 OutlinedButton(
                                     onClick = { runCommand("open $app") },
                                     modifier = Modifier.weight(1f),
-                                    colors =ButtonDefaults.outlinedButtonColors(
+                                    colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = cyan
                                     )
                                 ) {
@@ -668,4 +673,3 @@ Spacer(Modifier.height(22.dp))
 
     private var ttsLanguageReady: Boolean = false
 }
- 
