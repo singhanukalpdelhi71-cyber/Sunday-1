@@ -43,7 +43,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             SundayScreen()
         }
@@ -60,7 +59,6 @@ class MainActivity : ComponentActivity() {
             mutableStateOf("Systems online. Hello, I'm Sunday.")
         }
         var listening by remember { mutableStateOf(false) }
-
         var wakeWordEnabled by remember { mutableStateOf(false) }
         var wakeStatus by remember { mutableStateOf("Wake word is off") }
         var awaitingCommand by remember { mutableStateOf(false) }
@@ -71,7 +69,6 @@ class MainActivity : ComponentActivity() {
         var pendingCallNumber by remember {
             mutableStateOf<String?>(null)
         }
-
         var ttsReady by remember { mutableStateOf(false) }
 
         val tts = remember {
@@ -89,7 +86,6 @@ class MainActivity : ComponentActivity() {
 
         fun speak(message: String) {
             response = message
-
             if (ttsReady) {
                 tts.language = Locale.US
                 tts.speak(
@@ -103,7 +99,6 @@ class MainActivity : ComponentActivity() {
 
         fun searchContact(name: String): Pair<String, String>? {
             val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
-
             return contentResolver.query(
                 uri,
                 arrayOf(
@@ -127,7 +122,6 @@ class MainActivity : ComponentActivity() {
 
         fun handleContactRequest() {
             val requestedName = pendingContactName
-
             val match = try {
                 searchContact(requestedName)
             } catch (_: Exception) {
@@ -143,11 +137,9 @@ class MainActivity : ComponentActivity() {
             }
 
             val (name, number) = match
-
             if (pendingContactAction == "call") {
                 pendingCallName = name
                 pendingCallNumber = number
-
                 speak(
                     "I found $name. Please say confirm call " +
                     "to place the call, or cancel call to cancel."
@@ -173,14 +165,10 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestPermission()
             ) { granted ->
                 val number = pendingCallNumber
-
                 if (granted && !number.isNullOrBlank()) {
                     try {
                         startActivity(
-                            Intent(
-                                Intent.ACTION_CALL,
-                                Uri.parse("tel:$number")
-                            )
+                            Intent(Intent.ACTION_CALL, Uri.parse("tel:$number"))
                         )
                         speak("Calling $pendingCallName.")
                         pendingCallName = ""
@@ -205,10 +193,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val wakeHandler = remember {
-            Handler(Looper.getMainLooper())
-        }
-
+        val wakeHandler = remember { Handler(Looper.getMainLooper()) }
         val latestWakeEnabled = rememberUpdatedState(wakeWordEnabled)
         val latestAwaitingCommand = rememberUpdatedState(awaitingCommand)
 
@@ -231,9 +216,7 @@ class MainActivity : ComponentActivity() {
                 !latestWakeEnabled.value ||
                 latestAwaitingCommand.value ||
                 wakeRecognizer == null
-            ) {
-                return
-            }
+            ) return
 
             try {
                 wakeStatus = "Listening for Hey Sunday..."
@@ -241,9 +224,7 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {
                 wakeStatus = "Listening stopped. Tap to try again."
             }
-        }
-
-        fun runCommand(raw: String) {
+        }        fun runCommand(raw: String) {
             val text = raw.trim().lowercase(Locale.ROOT)
 
             if (text.isBlank()) {
@@ -252,15 +233,12 @@ class MainActivity : ComponentActivity() {
             }
 
             when {
-                text.startsWith("find contact ") ||
-                    text.startsWith("find ") -> {
-
+                text.startsWith("find contact ") || text.startsWith("find ") -> {
                     val prefix = if (text.startsWith("find contact ")) {
                         "find contact "
                     } else {
                         "find "
                     }
-
                     val name = raw.trim().drop(prefix.length).trim()
 
                     if (name.isBlank()) {
@@ -268,7 +246,6 @@ class MainActivity : ComponentActivity() {
                     } else {
                         pendingContactName = name
                         pendingContactAction = "find"
-
                         if (
                             ContextCompat.checkSelfPermission(
                                 this@MainActivity,
@@ -286,7 +263,6 @@ class MainActivity : ComponentActivity() {
 
                 text.startsWith("call ") -> {
                     val name = raw.trim().drop("call ".length).trim()
-
                     if (name.isBlank()) {
                         speak("Say call followed by the contact's name.")
                     } else {
@@ -294,7 +270,6 @@ class MainActivity : ComponentActivity() {
                         pendingContactAction = "call"
                         pendingCallName = ""
                         pendingCallNumber = null
-
                         if (
                             ContextCompat.checkSelfPermission(
                                 this@MainActivity,
@@ -310,11 +285,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                text == "confirm call" ||
-                    text == "yes confirm call" -> {
-
+                text == "confirm call" || text == "yes confirm call" -> {
                     val number = pendingCallNumber
-
                     if (number.isNullOrBlank()) {
                         speak("No call is waiting for confirmation.")
                     } else if (
@@ -325,10 +297,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         try {
                             startActivity(
-                                Intent(
-                                    Intent.ACTION_CALL,
-                                    Uri.parse("tel:$number")
-                                )
+                                Intent(Intent.ACTION_CALL, Uri.parse("tel:$number"))
                             )
                             speak("Calling $pendingCallName.")
                             pendingCallName = ""
@@ -337,9 +306,7 @@ class MainActivity : ComponentActivity() {
                             speak("I couldn't start the call.")
                         }
                     } else {
-                        callPermissionLauncher.launch(
-                            Manifest.permission.CALL_PHONE
-                        )
+                        callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
                     }
                 }
 
@@ -349,9 +316,7 @@ class MainActivity : ComponentActivity() {
                     speak("Call cancelled. I won't place the call.")
                 }
 
-                text == "hello" ||
-                    text == "hi sunday" ||
-                    text == "hello sunday" -> {
+                text == "hello" || text == "hi sunday" || text == "hello sunday" -> {
                     speak("Hello. Sunday is ready.")
                 }
 
@@ -360,7 +325,6 @@ class MainActivity : ComponentActivity() {
                         "h:mm a",
                         Locale.getDefault()
                     ).format(Date())
-
                     speak("The time is $time.")
                 }
 
@@ -368,8 +332,7 @@ class MainActivity : ComponentActivity() {
                     text.contains("introduce yourself") -> {
                     speak(
                         "I am Sunday, your personal Android assistant. " +
-                        "I can respond to commands, search contacts, " +
-                        "and open apps."
+                        "I can respond to commands, search contacts, and open apps."
                     )
                 }
 
@@ -392,13 +355,11 @@ class MainActivity : ComponentActivity() {
                     )
 
                     val packageName = packages[appName]
-
                     if (packageName == null) {
                         speak("I'm not sure which app you mean. Please say its exact name.")
                     } else {
                         val launchIntent =
                             packageManager.getLaunchIntentForPackage(packageName)
-
                         if (launchIntent != null) {
                             try {
                                 speak("Opening $appName.")
@@ -419,7 +380,9 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-        }        val speechLauncher = rememberLauncherForActivityResult(
+        }
+
+        val speechLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             listening = false
@@ -441,10 +404,7 @@ class MainActivity : ComponentActivity() {
             }
 
             if (wakeWordEnabled) {
-                wakeHandler.postDelayed(
-                    { startWakeListening() },
-                    700
-                )
+                wakeHandler.postDelayed({ startWakeListening() }, 700)
             }
         }
 
@@ -469,7 +429,6 @@ class MainActivity : ComponentActivity() {
                             "Speak to Sunday"
                         )
                     }
-
                     try {
                         listening = true
                         speechLauncher.launch(intent)
@@ -490,11 +449,7 @@ class MainActivity : ComponentActivity() {
                     if (wakeRecognizer != null) {
                         wakeWordEnabled = true
                         wakeStatus = "Starting wake-word listener..."
-
-                        wakeHandler.postDelayed(
-                            { startWakeListening() },
-                            300
-                        )
+                        wakeHandler.postDelayed({ startWakeListening() }, 300)
                     } else {
                         speak("Speech recognition is unavailable on this device.")
                     }
@@ -503,14 +458,11 @@ class MainActivity : ComponentActivity() {
                     wakeStatus = "Microphone permission is required."
                     speak("Please allow microphone access to use Hey Sunday.")
                 }
-            }
-
-        DisposableEffect(wakeRecognizer) {
+            }        DisposableEffect(wakeRecognizer) {
             val recognizer = wakeRecognizer
 
             if (recognizer != null) {
                 val listener = object : RecognitionListener {
-
                     override fun onReadyForSpeech(params: Bundle?) {
                         if (latestWakeEnabled.value) {
                             wakeStatus = "Listening for Hey Sunday..."
@@ -518,11 +470,8 @@ class MainActivity : ComponentActivity() {
                     }
 
                     override fun onBeginningOfSpeech() = Unit
-
                     override fun onRmsChanged(rmsdB: Float) = Unit
-
                     override fun onBufferReceived(buffer: ByteArray?) = Unit
-
                     override fun onEndOfSpeech() = Unit
 
                     override fun onError(error: Int) {
@@ -530,10 +479,7 @@ class MainActivity : ComponentActivity() {
                             latestWakeEnabled.value &&
                             !latestAwaitingCommand.value
                         ) {
-                            wakeHandler.postDelayed(
-                                { startWakeListening() },
-                                1000
-                            )
+                            wakeHandler.postDelayed({ startWakeListening() }, 1000)
                         }
                     }
 
@@ -541,9 +487,7 @@ class MainActivity : ComponentActivity() {
                         val matches = results?.getStringArrayList(
                             SpeechRecognizer.RESULTS_RECOGNITION
                         )
-
-                        val heard = matches
-                            ?.firstOrNull()
+                        val heard = matches?.firstOrNull()
                             .orEmpty()
                             .lowercase(Locale.ROOT)
 
@@ -552,16 +496,11 @@ class MainActivity : ComponentActivity() {
                             heard.contains("hey, sunday") ||
                             heard.contains("hey sundae")
 
-                        if (
-                            wakePhraseDetected &&
-                            latestWakeEnabled.value
-                        ) {
+                        if (wakePhraseDetected && latestWakeEnabled.value) {
                             awaitingCommand = true
                             wakeStatus = "Wake phrase detected..."
-
                             try {
                                 recognizer.cancel()
-
                                 val commandIntent = Intent(
                                     RecognizerIntent.ACTION_RECOGNIZE_SPEECH
                                 ).apply {
@@ -578,35 +517,21 @@ class MainActivity : ComponentActivity() {
                                         "Yes? What can I do for you?"
                                     )
                                 }
-
                                 listening = true
                                 speechLauncher.launch(commandIntent)
                             } catch (_: Exception) {
                                 listening = false
                                 awaitingCommand = false
                                 wakeStatus = "Tap the microphone to speak."
-
-                                wakeHandler.postDelayed(
-                                    { startWakeListening() },
-                                    1000
-                                )
+                                wakeHandler.postDelayed({ startWakeListening() }, 1000)
                             }
                         } else if (latestWakeEnabled.value) {
-                            wakeHandler.postDelayed(
-                                { startWakeListening() },
-                                500
-                            )
+                            wakeHandler.postDelayed({ startWakeListening() }, 500)
                         }
                     }
 
-                    override fun onPartialResults(
-                        partialResults: Bundle?
-                    ) = Unit
-
-                    override fun onEvent(
-                        eventType: Int,
-                        params: Bundle?
-                    ) = Unit
+                    override fun onPartialResults(partialResults: Bundle?) = Unit
+                    override fun onEvent(eventType: Int, params: Bundle?) = Unit
                 }
 
                 recognizer.setRecognitionListener(listener)
@@ -616,7 +541,6 @@ class MainActivity : ComponentActivity() {
 
             onDispose {
                 wakeHandler.removeCallbacksAndMessages(null)
-
                 try {
                     recognizer?.cancel()
                     recognizer?.destroy()
@@ -659,19 +583,13 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .size(190.dp)
-                            .background(
-                                Color(0xFF0C2B40),
-                                CircleShape
-                            ),
+                            .background(Color(0xFF0C2B40), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(145.dp)
-                                .background(
-                                    Color(0xFF10506A),
-                                    CircleShape
-                                ),
+                                .background(Color(0xFF10506A), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
@@ -693,11 +611,7 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(20.dp))
 
                     Text(
-                        text = if (listening) {
-                            "LISTENING..."
-                        } else {
-                            "SYSTEM ONLINE"
-                        },
+                        text = if (listening) "LISTENING..." else "SYSTEM ONLINE",
                         color = cyan,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -707,9 +621,7 @@ class MainActivity : ComponentActivity() {
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = panel
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = panel),
                         shape = RoundedCornerShape(18.dp)
                     ) {
                         Column(Modifier.padding(18.dp)) {
@@ -718,9 +630,7 @@ class MainActivity : ComponentActivity() {
                                 color = cyan,
                                 fontWeight = FontWeight.Bold
                             )
-
                             Spacer(Modifier.height(8.dp))
-
                             Text(
                                 text = response,
                                 color = Color.White,
@@ -729,7 +639,9 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Spacer(Modifier.height(24.dp))                    OutlinedTextField(
+                    Spacer(Modifier.height(24.dp))
+
+                    OutlinedTextField(
                         value = command,
                         onValueChange = { command = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -763,10 +675,7 @@ class MainActivity : ComponentActivity() {
                             contentColor = navy
                         )
                     ) {
-                        Text(
-                            text = "EXECUTE COMMAND",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("EXECUTE COMMAND", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -795,7 +704,6 @@ class MainActivity : ComponentActivity() {
                                         "Speak to Sunday"
                                     )
                                 }
-
                                 try {
                                     listening = true
                                     speechLauncher.launch(intent)
@@ -810,9 +718,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = cyan
-                        )
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = cyan)
                     ) {
                         Text("🎙  SPEAK TO SUNDAY")
                     }
@@ -826,7 +732,6 @@ class MainActivity : ComponentActivity() {
                                 awaitingCommand = false
                                 wakeStatus = "Wake word is off"
                                 wakeHandler.removeCallbacksAndMessages(null)
-
                                 try {
                                     wakeRecognizer?.cancel()
                                 } catch (_: Exception) {
@@ -840,17 +745,11 @@ class MainActivity : ComponentActivity() {
                                     ) == PackageManager.PERMISSION_GRANTED
                                 ) {
                                     if (wakeRecognizer == null) {
-                                        speak(
-                                            "Speech recognition is unavailable on this device."
-                                        )
+                                        speak("Speech recognition is unavailable on this device.")
                                     } else {
                                         wakeWordEnabled = true
                                         wakeStatus = "Starting wake-word listener..."
-
-                                        wakeHandler.postDelayed(
-                                            { startWakeListening() },
-                                            300
-                                        )
+                                        wakeHandler.postDelayed({ startWakeListening() }, 300)
                                     }
                                 } else {
                                     wakePermissionLauncher.launch(
@@ -881,11 +780,7 @@ class MainActivity : ComponentActivity() {
 
                     Text(
                         text = wakeStatus,
-                        color = if (wakeWordEnabled) {
-                            cyan
-                        } else {
-                            Color.LightGray
-                        },
+                        color = if (wakeWordEnabled) cyan else Color.LightGray,
                         fontSize = 12.sp
                     )
 
@@ -918,9 +813,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             rowApps.forEach { app ->
                                 OutlinedButton(
-                                    onClick = {
-                                        runCommand("open $app")
-                                    },
+                                    onClick = { runCommand("open $app") },
                                     modifier = Modifier.weight(1f),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = cyan
@@ -929,7 +822,6 @@ class MainActivity : ComponentActivity() {
                                     Text(app)
                                 }
                             }
-
                             if (rowApps.size == 1) {
                                 Spacer(Modifier.weight(1f))
                             }
